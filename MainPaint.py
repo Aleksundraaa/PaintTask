@@ -40,7 +40,12 @@ class MainPaint:
         self.history_manager.save_state()
 
         if self.drawing_tools.current_tool == "selection":
-            self.selection_manager.start_selection(event.x, event.y)
+            if self.selection_manager.rect and self.selection_manager.point_in_selection(event.x, event.y):
+                # Если клик внутри существующего выделения - начинаем перетаскивание
+                self.selection_manager.start_dragging(event.x, event.y)
+            else:
+                # Иначе начинаем новое выделение
+                self.selection_manager.start_selection(event.x, event.y)
         else:
             self.drawing_tools.on_button_press(event.x, event.y)
 
