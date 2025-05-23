@@ -277,3 +277,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = MainPaint(root)
     root.mainloop()
+#     саша пися
