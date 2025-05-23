@@ -1,6 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, colorchooser, messagebox, simpledialog
-from PIL import Image, ImageDraw, ImageTk, ImageColor
+from PIL import Image, ImageDraw, ImageTk
 
 class CanvasManager:
     def __init__(self, root, width, height, bg_color):
