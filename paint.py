@@ -3,51 +3,231 @@ from tkinter import filedialog, colorchooser, messagebox, simpledialog
 from PIL import Image, ImageDraw, ImageTk, ImageColor
 
 
-class MainPaint:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Графический редактор")
+class CanvasManager:
+    def __init__(self, root, width, height, bg_color):
+        self.width = width
+        self.height = height
+        self.bg_color = bg_color
 
-        self.selection_rect = None
-        self.selection_start = None
-        self.selection_end = None
-        self.selection_active = False
-        self.selection_image = None
-        self.selection_offset = (0, 0)
+        self.canvas = tk.Canvas(root, width=width, height=height, bg=bg_color)
+        self.canvas.pack()
 
-        self.clipboard = None
+        self.image = Image.new("RGB", (width, height), bg_color)
+        self.draw = ImageDraw.Draw(self.image)
+        self.photo_image = None
 
+    def update_canvas(self):
+        self.canvas.delete("all")
+        self.photo_image = ImageTk.PhotoImage(self.image)
+        self.canvas.create_image(0, 0, image=self.photo_image, anchor=tk.NW)
+
+    def resize_canvas(self, width, height):
+        old_image = self.image.copy()
+        self.width = width
+        self.height = height
+        self.image = Image.new("RGB", (width, height), self.bg_color)
+        self.image.paste(old_image, (0, 0))
+        self.draw = ImageDraw.Draw(self.image)
+        self.canvas.config(width=width, height=height)
+        self.update_canvas()
+
+
+class SelectionManager:
+    def __init__(self, canvas_manager):
+        self.canvas_manager = canvas_manager
+        self.rect = None
+        self.start = None
+        self.end = None
+        self.active = False
+        self.image = None
+        self.offset = (0, 0)
+
+    def start_selection(self, x, y):
+        self.start = (x, y)
+        self.rect = (x, y, x, y)
+        self.active = True
+        self.update_selection_display()
+
+    def update_selection(self, x, y):
+        if self.active and self.start:
+            x1, y1 = self.start
+            self.rect = (x1, y1, x, y)
+            self.update_selection_display()
+
+    def end_selection(self, x, y):
+        if self.start:
+            x1, y1 = self.start
+            x2, y2 = x, y
+            self.rect = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+            self.update_selection_display()
+
+    def update_selection_display(self):
+        self.canvas_manager.update_canvas()
+        if self.rect:
+            x1, y1, x2, y2 = self.rect
+            self.canvas_manager.canvas.create_rectangle(
+                x1, y1, x2, y2, outline="red", dash=(4, 4), tags="selection")
+
+    def cancel_selection(self):
+        self.rect = None
+        self.active = False
+        self.canvas_manager.update_canvas()
+
+    def get_selection_area(self):
+        if self.rect:
+            return (min(self.rect[0], self.rect[2]),
+                    min(self.rect[1], self.rect[3]),
+                    max(self.rect[0], self.rect[2]),
+                    max(self.rect[1], self.rect[3]))
+        return None
+
+
+class DrawingTools:
+    def __init__(self, canvas_manager):
+        self.canvas_manager = canvas_manager
+        self.current_tool = "brush"
+        self.current_color = "black"
+        self.current_size = 5
         self.last_x = None
         self.last_y = None
         self.start_x = None
         self.start_y = None
 
-        self.photo_image = None
+    def set_tool(self, tool):
+        self.current_tool = tool
 
-        self.canvas_width = 800
-        self.canvas_height = 600
-        self.background_colour = "white"
+    def set_color(self, color):
+        self.current_color = color
 
-        self.canvas = tk.Canvas(root, width=self.canvas_width, height=self.canvas_height, bg=self.background_colour)
-        self.canvas.pack()
+    def set_size(self, size):
+        self.current_size = size
 
-        self.image = Image.new("RGB", (self.canvas_width, self.canvas_height), self.background_colour)
-        self.draw = ImageDraw.Draw(self.image)
+    def on_button_press(self, x, y):
+        self.start_x, self.start_y = x, y
+        self.last_x, self.last_y = x, y
 
-        self.current_tool = "brush"
-        self.current_colour = "black"
+        if self.current_tool == "fill":
+            fill_color = ImageColor.getrgb(self.current_color)
+            ImageDraw.floodfill(self.canvas_manager.image, (x, y), fill_color)
+            self.canvas_manager.update_canvas()
 
+    def on_mouse_drag(self, x, y):
+        if self.current_tool in ["brush", "eraser"]:
+            color = self.current_color if self.current_tool == "brush" else self.canvas_manager.bg_color
+            self.canvas_manager.canvas.create_line(
+                self.last_x, self.last_y, x, y, fill=color, width=self.current_size)
+            self.canvas_manager.draw.line(
+                [self.last_x, self.last_y, x, y], fill=color, width=self.current_size)
+            self.last_x, self.last_y = x, y
+            self.canvas_manager.update_canvas()
+
+        elif self.current_tool in ["circle", "rectangle", "straight_line", "ellipse"]:
+            self.draw_temp_shape(x, y)
+
+    def on_button_release(self, x, y):
+        if self.current_tool == "circle":
+            self.draw_circle(x, y)
+        elif self.current_tool == "rectangle":
+            self.draw_rectangle(x, y)
+        elif self.current_tool == "straight_line":
+            self.draw_line(x, y)
+        elif self.current_tool == "ellipse":
+            self.draw_ellipse(x, y)
+
+        self.canvas_manager.update_canvas()
+
+    def draw_temp_shape(self, x, y):
+        self.canvas_manager.canvas.delete("temp_shape")
+
+        if self.current_tool == "circle":
+            radius = ((x - self.start_x) ** 2 + (y - self.start_y) ** 2) ** 0.5
+            self.canvas_manager.canvas.create_oval(
+                self.start_x - radius, self.start_y - radius,
+                self.start_x + radius, self.start_y + radius,
+                outline=self.current_color, width=self.current_size, tags="temp_shape")
+
+        elif self.current_tool == "rectangle":
+            self.canvas_manager.canvas.create_rectangle(
+                self.start_x, self.start_y, x, y,
+                outline=self.current_color, width=self.current_size, tags="temp_shape")
+
+        elif self.current_tool == "straight_line":
+            self.canvas_manager.canvas.create_line(
+                self.start_x, self.start_y, x, y,
+                fill=self.current_color, width=self.current_size, tags="temp_shape")
+
+        elif self.current_tool == "ellipse":
+            self.canvas_manager.canvas.create_oval(
+                self.start_x, self.start_y, x, y,
+                outline=self.current_color, width=self.current_size, tags="temp_shape")
+
+    def draw_circle(self, x, y):
+        radius = ((x - self.start_x) ** 2 + (y - self.start_y) ** 2) ** 0.5
+        self.canvas_manager.draw.ellipse([
+            self.start_x - radius, self.start_y - radius,
+            self.start_x + radius, self.start_y + radius],
+            outline=self.current_color, width=self.current_size)
+
+    def draw_rectangle(self, x, y):
+        self.canvas_manager.draw.rectangle([
+            self.start_x, self.start_y, x, y],
+            outline=self.current_color, width=self.current_size)
+
+    def draw_line(self, x, y):
+        self.canvas_manager.draw.line([
+            self.start_x, self.start_y, x, y],
+            fill=self.current_color, width=self.current_size)
+
+    def draw_ellipse(self, x, y):
+        self.canvas_manager.draw.ellipse([
+            self.start_x, self.start_y, x, y],
+            outline=self.current_color, width=self.current_size)
+
+
+class HistoryManager:
+    def __init__(self, canvas_manager):
+        self.canvas_manager = canvas_manager
         self.history = []
-        self.current_size = 5
+
+    def save_state(self):
+        state = self.canvas_manager.image.copy()
+        self.history.append(state)
+
+    def undo(self):
+        if self.history:
+            self.canvas_manager.image = self.history.pop()
+            self.canvas_manager.draw = ImageDraw.Draw(self.canvas_manager.image)
+            self.canvas_manager.update_canvas()
+
+
+class MainPaint:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Графический редактор")
+
+        self.canvas_manager = CanvasManager(root, 800, 600, "white")
+        self.selection_manager = SelectionManager(self.canvas_manager)
+        self.drawing_tools = DrawingTools(self.canvas_manager)
+        self.history_manager = HistoryManager(self.canvas_manager)
+
+        self.clipboard = None
 
         self.setup_menu()
         self.setup_bindings()
-        self.update_canvas()
 
     def setup_menu(self):
         menu = tk.Menu(self.root)
         self.root.config(menu=menu)
 
+        self._setup_file_menu(menu)
+        self._setup_selection_menu(menu)
+        self._setup_size_menu(menu)
+        self._setup_tools_menu(menu)
+        self._setup_color_menu(menu)
+        self._setup_geometry_menu(menu)
+        self._setup_text_menu(menu)
+
+    def _setup_file_menu(self, menu):
         file_menu = tk.Menu(menu)
         menu.add_cascade(label="Файл", menu=file_menu)
         file_menu.add_command(label="Сохранить как...", command=self.save_image)
@@ -55,235 +235,123 @@ class MainPaint:
         file_menu.add_command(label="Закрыть", command=self.root.quit)
         file_menu.add_command(label="Размер холста", command=self.change_canvas_size)
 
+    def _setup_selection_menu(self, menu):
         selection_menu = tk.Menu(menu)
         menu.add_cascade(label="Выделить", menu=selection_menu)
-        selection_menu.add_command(label="Прямоугольное выделение", command=lambda: self.select_tool("selection"))
+        selection_menu.add_command(label="Прямоугольное выделение",
+                                   command=lambda: self.drawing_tools.set_tool("selection"))
         selection_menu.add_command(label="Залить выделение", command=self.fill_selection)
         selection_menu.add_command(label="Вырезать выделения", command=self.cut_selection)
-        selection_menu.add_command(label="Отменить выделение", command=self.cancel_selection)
+        selection_menu.add_command(label="Отменить выделение", command=self.selection_manager.cancel_selection)
 
+    def _setup_size_menu(self, menu):
         size_menu = tk.Menu(menu)
         menu.add_cascade(label="Размер", menu=size_menu)
-        size_menu.add_command(label="2", command=lambda: self.set_size(2))
-        size_menu.add_command(label="5", command=lambda: self.set_size(5))
-        size_menu.add_command(label="7", command=lambda: self.set_size(7))
-        size_menu.add_command(label="9", command=lambda: self.set_size(9))
-        size_menu.add_command(label="11", command=lambda: self.set_size(11))
-        size_menu.add_command(label="15", command=lambda: self.set_size(15))
-        size_menu.add_command(label="Свой размер", command=lambda: self.input_size())
+        for size in [2, 5, 7, 9, 11, 15]:
+            size_menu.add_command(label=str(size), command=lambda s=size: self.drawing_tools.set_size(s))
+        size_menu.add_command(label="Свой размер", command=self.input_size)
 
+    def _setup_tools_menu(self, menu):
         tools_menu = tk.Menu(menu)
         menu.add_cascade(label="Инструменты", menu=tools_menu)
-        tools_menu.add_command(label="Кисть", command=lambda: self.select_tool("brush"))
-        tools_menu.add_command(label="Ластик", command=lambda: self.select_tool("eraser"))
-        tools_menu.add_command(label="Заливка", command=lambda: self.select_tool("fill"))
+        tools_menu.add_command(label="Кисть", command=lambda: self.drawing_tools.set_tool("brush"))
+        tools_menu.add_command(label="Ластик", command=lambda: self.drawing_tools.set_tool("eraser"))
+        tools_menu.add_command(label="Заливка", command=lambda: self.drawing_tools.set_tool("fill"))
 
+    def _setup_color_menu(self, menu):
         colour_menu = tk.Menu(menu)
         menu.add_cascade(label="Цвет", menu=colour_menu)
         colour_menu.add_command(label="Выбор цвета", command=self.choose_color)
 
+    def _setup_geometry_menu(self, menu):
         geometry_menu = tk.Menu(menu)
         menu.add_cascade(label="Геометрическая фигура", menu=geometry_menu)
-        geometry_menu.add_command(label="Круг", command=lambda: self.select_tool("circle"))
-        geometry_menu.add_command(label="Прямоугольник", command=lambda: self.select_tool("rectangle"))
-        geometry_menu.add_command(label="Прямая линия", command=lambda: self.select_tool("straight_line"))
-        geometry_menu.add_command(label="Эллипс", command=lambda: self.select_tool("ellipse"))
+        geometry_menu.add_command(label="Круг", command=lambda: self.drawing_tools.set_tool("circle"))
+        geometry_menu.add_command(label="Прямоугольник", command=lambda: self.drawing_tools.set_tool("rectangle"))
+        geometry_menu.add_command(label="Прямая линия", command=lambda: self.drawing_tools.set_tool("straight_line"))
+        geometry_menu.add_command(label="Эллипс", command=lambda: self.drawing_tools.set_tool("ellipse"))
 
+    def _setup_text_menu(self, menu):
         text_menu = tk.Menu(menu)
         menu.add_cascade(label="Текст", menu=text_menu)
         text_menu.add_command(label="Добавить текст")
 
+    def setup_bindings(self):
+        self.canvas_manager.canvas.bind("<Button-1>", self.on_button_press)
+        self.canvas_manager.canvas.bind("<B1-Motion>", self.on_mouse_drag)
+        self.canvas_manager.canvas.bind("<ButtonRelease-1>", self.on_button_release)
+        self.root.bind("<Control-z>", self.undo)
+        self.root.bind("<Control-s>", self.save_image)
+        self.root.bind("<Control-x>", lambda e: self.cut_selection())
+
+    def on_button_press(self, event):
+        self.history_manager.save_state()
+
+        if self.drawing_tools.current_tool == "selection":
+            self.selection_manager.start_selection(event.x, event.y)
+        else:
+            self.drawing_tools.on_button_press(event.x, event.y)
+
+    def on_mouse_drag(self, event):
+        if self.drawing_tools.current_tool == "selection":
+            self.selection_manager.update_selection(event.x, event.y)
+        else:
+            self.drawing_tools.on_mouse_drag(event.x, event.y)
+
+    def on_button_release(self, event):
+        if self.drawing_tools.current_tool == "selection":
+            self.selection_manager.end_selection(event.x, event.y)
+        else:
+            self.drawing_tools.on_button_release(event.x, event.y)
+
     def save_image(self, event=None):
-        file_path = filedialog.asksaveasfilename(defaultextension='.png',
-                                                 filetypes=[("PNG files", "*.png"),
-                                                            ("JPEG files", "*.jpg"),
-                                                            ("BMP files", "*.bmp")])
+        file_path = filedialog.asksaveasfilename(
+            defaultextension='.png',
+            filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("BMP files", "*.bmp")])
         if file_path:
-            self.image.save(file_path)
+            self.canvas_manager.image.save(file_path)
             messagebox.showinfo("Сохранение...", "Сохранено!")
-
-    def set_size(self, size):
-        self.current_size = size
-
-    def input_size(self):
-        size = simpledialog.askinteger("Размер кисти", "Введите размер", minvalue=1, maxvalue=100)
-        if size:
-            self.set_size(size)
 
     def change_canvas_size(self):
         width = simpledialog.askinteger("Ширина холста", "Введите ширину", minvalue=100, maxvalue=2000)
         height = simpledialog.askinteger("Высота холста", "Введите высоту", minvalue=100, maxvalue=2000)
         if width and height:
-            self.canvas_width = width
-            self.canvas_height = height
-            self.update_canvas_size()
+            self.canvas_manager.resize_canvas(width, height)
 
     def choose_color(self):
         color = colorchooser.askcolor()[1]
         if color:
-            self.current_colour = color
+            self.drawing_tools.set_color(color)
 
-    def setup_bindings(self):
-        self.canvas.bind("<Button-1>", self.on_button_press)
-        self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
-        self.canvas.bind("<ButtonRelease-1>", self.on_button_release)
-        self.root.bind("<Control-z>", self.remove_last_action)
-        self.root.bind("<Control-s>", self.save_image)
-        self.root.bind("<Control-x>", self.cut_selection)
-
-    def remove_last_action(self, event=None):
-        if len(self.history) > 0:
-            self.image = self.history.pop()
-            self.draw = ImageDraw.Draw(self.image)
-            self.update_canvas()
-
-    def update_canvas(self):
-        self.canvas.delete("all")
-        self.photo_image = ImageTk.PhotoImage(self.image)
-        self.canvas.create_image(0, 0, image=self.photo_image, anchor=tk.NW)
-
-        if self.selection_rect:
-            x1, y1, x2, y2 = self.selection_rect
-            self.canvas.create_rectangle(x1, y1, x2, y2, outline="red", dash=(4, 4), tags="selection")
-
-    def update_canvas_size(self):
-        old_image = self.image.copy()
-        self.image = Image.new("RGB", (self.canvas_width, self.canvas_height), self.background_colour)
-        self.image.paste(old_image, (0, 0))
-        self.draw = ImageDraw.Draw(self.image)
-        self.canvas.config(width=self.canvas_width, height=self.canvas_height)
-        self.update_canvas()
-
-    def select_tool(self, tool):
-        if self.current_tool == "selection" and tool != "selection":
-            self.cancel_selection()
-        self.current_tool = tool
-
-    def cancel_selection(self):
-        self.selection_rect = None
-        self.selection_active = False
-        self.update_canvas()
+    def input_size(self):
+        size = simpledialog.askinteger("Размер кисти", "Введите размер", minvalue=1, maxvalue=100)
+        if size:
+            self.drawing_tools.set_size(size)
 
     def fill_selection(self):
-        if self.selection_rect:
-            self.save_state()
-            x1, y1, x2, y2 = self.selection_rect
-            temp_image = Image.new("RGB", (abs(x2 - x1), abs(y2 - y1)), self.current_colour)
-            self.image.paste(temp_image, (min(x1, x2), min(y1, y2)))
-            self.draw = ImageDraw.Draw(self.image)
-            self.update_canvas()
-            self.cancel_selection()
+        if self.selection_manager.rect:
+            self.history_manager.save_state()
+            x1, y1, x2, y2 = self.selection_manager.get_selection_area()
+            temp_image = Image.new("RGB", (abs(x2 - x1), abs(y2 - y1)), self.drawing_tools.current_color)
+            self.canvas_manager.image.paste(temp_image, (min(x1, x2), min(y1, y2)))
+            self.canvas_manager.draw = ImageDraw.Draw(self.canvas_manager.image)
+            self.canvas_manager.update_canvas()
+            self.selection_manager.cancel_selection()
 
     def cut_selection(self):
-        if self.selection_rect:
-            self.save_state()
-            x1, y1, x2, y2 = self.selection_rect
-            width = abs(x2 - x1)
-            height = abs(y2 - y1)
-            self.clipboard = self.image.crop((min(x1, y1), min(y1, y2), max(x1, x2), max(y1, y2)))
-            self.draw.rectangle([x1, y1, x2, y2], fill=self.background_colour, outline=self.background_colour)
-            self.update_canvas()
-            self.cancel_selection()
+        if self.selection_manager.rect:
+            self.history_manager.save_state()
+            x1, y1, x2, y2 = self.selection_manager.get_selection_area()
+            self.clipboard = self.canvas_manager.image.crop((x1, y1, x2, y2))
+            self.canvas_manager.draw.rectangle(
+                [x1, y1, x2, y2],
+                fill=self.canvas_manager.bg_color,
+                outline=self.canvas_manager.bg_color)
+            self.canvas_manager.update_canvas()
+            self.selection_manager.cancel_selection()
 
-    def save_state(self):
-        state = self.image.copy()
-        self.history.append(state)
-
-    def on_button_press(self, event):
-        self.start_x, self.start_y = event.x, event.y
-        self.last_x, self.last_y = event.x, event.y
-
-        if self.current_tool == "selection":
-            self.selection_start = (event.x, event.y)
-            self.selection_rect = (event.x, event.y, event.x, event.y)
-            self.selection_active = True
-
-        if self.current_tool == "fill":
-            self.save_state()
-            fill_color = ImageColor.getrgb(self.current_colour)
-            ImageDraw.floodfill(self.image, (event.x, event.y), fill_color)
-            self.update_canvas()
-        else:
-            self.save_state()
-
-    def on_button_release(self, event):
-        if self.current_tool == "circle":
-            self.canvas.delete("temp_circle")
-            radius = ((event.x - self.start_x) ** 2 + (event.y - self.start_y) ** 2) ** 0.5
-            self.draw.ellipse([self.start_x - radius, self.start_y - radius,
-                               self.start_x + radius, self.start_y + radius],
-                              outline=self.current_colour, width=self.current_size)
-            self.update_canvas()
-
-        elif self.current_tool == "rectangle":
-            self.canvas.delete("temp_rectangle")
-            self.draw.rectangle([self.start_x, self.start_y, event.x, event.y],
-                                outline=self.current_colour, width=self.current_size)
-            self.update_canvas()
-
-        elif self.current_tool == "straight_line":
-            self.canvas.delete("temp_line")
-            self.draw.line([self.start_x, self.start_y, event.x, event.y], fill=self.current_colour,
-                           width=self.current_size)
-            self.update_canvas()
-
-
-        elif self.current_tool == "ellipse":
-            self.canvas.delete("temp_shape")
-            self.draw.ellipse([self.start_x, self.start_y, event.x, event.y],
-                              outline=self.current_colour, width=self.current_size)
-            self.update_canvas()
-
-        elif self.current_tool == "selection":
-            self.selection_end = (event.x, event.y)
-            x1, y1 = self.selection_start
-            x2, y2 = self.selection_end
-            self.selection_rect = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
-            self.update_canvas()
-
-    def on_mouse_drag(self, event):
-        if self.current_tool in ["brush", "eraser"]:
-            if self.current_tool == "brush":
-                self.canvas.create_line(self.last_x, self.last_y, event.x, event.y,
-                                        fill=self.current_colour, width=self.current_size)
-                self.draw.line([self.last_x, self.last_y, event.x, event.y],
-                               fill=self.current_colour, width=self.current_size)
-            elif self.current_tool == "eraser":
-                self.canvas.create_line(self.last_x, self.last_y, event.x, event.y,
-                                        fill=self.background_colour, width=self.current_size)
-                self.draw.line([self.last_x, self.last_y, event.x, event.y],
-                               fill=self.background_colour, width=self.current_size)
-
-            self.last_x, self.last_y = event.x, event.y
-            self.update_canvas()
-
-        elif self.current_tool == "circle":
-            self.canvas.delete("temp_circle")
-            radius = ((event.x - self.start_x) ** 2 + (event.y - self.start_y) ** 2) ** 0.5
-            self.canvas.create_oval(self.start_x - radius, self.start_y - radius,
-                                    self.start_x + radius, self.start_y + radius,
-                                    outline=self.current_colour, width=self.current_size, tags="temp_circle")
-
-        elif self.current_tool == "rectangle":
-            self.canvas.delete("temp_rectangle")
-            self.canvas.create_rectangle(self.start_x, self.start_y, event.x, event.y, outline=self.current_colour,
-                                         width=self.current_size, tags="temp_rectangle")
-
-        elif self.current_tool == "straight_line":
-            self.canvas.delete("temp_line")
-            self.canvas.create_line(self.start_x, self.start_y, event.x, event.y,
-                                    fill=self.current_colour, width=self.current_size,
-                                    tags="temp_line")
-
-        elif self.current_tool == "ellipse":
-            self.canvas.delete("temp_ellipse")
-            self.canvas.create_oval(self.start_x, self.start_y, event.x, event.y,
-                                    outline=self.current_colour, width=self.current_size, tags="temp_ellipse")
-
-        elif self.current_tool == "selection" and self.selection_active:
-            x1, y1 = self.selection_start
-            self.selection_rect = (x1, y1, event.x, event.y)
-            self.update_canvas()
+    def undo(self, event=None):
+        self.history_manager.undo()
 
 
 if __name__ == "__main__":
