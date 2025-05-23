@@ -1,5 +1,6 @@
 from PIL import ImageDraw, ImageColor
 
+
 class DrawingTools:
     def __init__(self, canvas_manager):
         self.canvas_manager = canvas_manager
@@ -100,4 +101,3 @@ class DrawingTools:
         self.canvas_manager.draw.ellipse([
             self.start_x, self.start_y, x, y],
             outline=self.current_color, width=self.current_size)
-

@@ -1,6 +1,7 @@
 import tkinter as tk
 from PIL import Image, ImageDraw, ImageTk
 
+
 class CanvasManager:
     def __init__(self, root, width, height, bg_color):
         self.width = width
