@@ -57,7 +57,7 @@ class MainPaint:
         menu.add_cascade(label="Выделить", menu=selection_menu)
         selection_menu.add_command(label="Прямоугольное выделение", command=lambda: self.select_tool("selection"))
         selection_menu.add_command(label = "Залить выделение", command=self.fill_selection)
-        selection_menu.add_command(label="Удалить выделение", command=self.cancel_selection)
+        selection_menu.add_command(label="Отменить выделение", command=self.cancel_selection)
 
         size_menu = tk.Menu(menu)
         menu.add_cascade(label="Размер", menu=size_menu)
@@ -138,7 +138,7 @@ class MainPaint:
         self.photo_image = ImageTk.PhotoImage(self.image)
         self.canvas.create_image(0, 0, image=self.photo_image, anchor=tk.NW)
 
-        if self.selection_image and self.selection_offset:
+        if self.selection_rect:
             x1, y1, x2, y2 = self.selection_rect
             self.canvas.create_rectangle(x1, y1, x2, y2, outline="red", dash=(4, 4), tags="selection")
 
@@ -182,8 +182,7 @@ class MainPaint:
         if self.current_tool == "selection":
             self.selection_start = (event.x, event.y)
             self.selection_rect = (event.x, event.y, event.x, event.y)
-
-
+            self.selection_active = True
 
         if self.current_tool == "fill":
             self.save_state()
@@ -226,6 +225,7 @@ class MainPaint:
             x1, y1 = self.selection_start
             x2, y2 = self.selection_end
             self.selection_rect = (min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
+            self.update_canvas()
 
     def on_mouse_drag(self, event):
         if self.current_tool in ["brush", "eraser"]:
@@ -271,10 +271,7 @@ class MainPaint:
             self.selection_rect = (x1, y1, event.x, event.y)
             self.update_canvas()
 
-
-
 if __name__ == "__main__":
     root = tk.Tk()
     app = MainPaint(root)
     root.mainloop()
-#     саша пися
