@@ -15,6 +15,8 @@ class MainPaint:
         self.selection_image = None
         self.selection_offset = (0, 0)
 
+        self.clipboard = None
+
         self.last_x = None
         self.last_y = None
         self.start_x = None
@@ -56,7 +58,8 @@ class MainPaint:
         selection_menu = tk.Menu(menu)
         menu.add_cascade(label="Выделить", menu=selection_menu)
         selection_menu.add_command(label="Прямоугольное выделение", command=lambda: self.select_tool("selection"))
-        selection_menu.add_command(label = "Залить выделение", command=self.fill_selection)
+        selection_menu.add_command(label="Залить выделение", command=self.fill_selection)
+        selection_menu.add_command(label="Вырезать выделения", command=self.cut_selection)
         selection_menu.add_command(label="Отменить выделение", command=self.cancel_selection)
 
         size_menu = tk.Menu(menu)
@@ -126,6 +129,7 @@ class MainPaint:
         self.canvas.bind("<ButtonRelease-1>", self.on_button_release)
         self.root.bind("<Control-z>", self.remove_last_action)
         self.root.bind("<Control-s>", self.save_image)
+        self.root.bind("<Control-x>", self.cut_selection)
 
     def remove_last_action(self, event=None):
         if len(self.history) > 0:
@@ -142,7 +146,6 @@ class MainPaint:
             x1, y1, x2, y2 = self.selection_rect
             self.canvas.create_rectangle(x1, y1, x2, y2, outline="red", dash=(4, 4), tags="selection")
 
-
     def update_canvas_size(self):
         old_image = self.image.copy()
         self.image = Image.new("RGB", (self.canvas_width, self.canvas_height), self.background_colour)
@@ -152,7 +155,7 @@ class MainPaint:
         self.update_canvas()
 
     def select_tool(self, tool):
-        if self.current_tool=="selection" and tool!="selection":
+        if self.current_tool == "selection" and tool != "selection":
             self.cancel_selection()
         self.current_tool = tool
 
@@ -165,9 +168,20 @@ class MainPaint:
         if self.selection_rect:
             self.save_state()
             x1, y1, x2, y2 = self.selection_rect
-            temp_image = Image.new("RGB", (abs(x2-x1), abs(y2-y1)), self.current_colour)
+            temp_image = Image.new("RGB", (abs(x2 - x1), abs(y2 - y1)), self.current_colour)
             self.image.paste(temp_image, (min(x1, x2), min(y1, y2)))
             self.draw = ImageDraw.Draw(self.image)
+            self.update_canvas()
+            self.cancel_selection()
+
+    def cut_selection(self):
+        if self.selection_rect:
+            self.save_state()
+            x1, y1, x2, y2 = self.selection_rect
+            width = abs(x2 - x1)
+            height = abs(y2 - y1)
+            self.clipboard = self.image.crop((min(x1, y1), min(y1, y2), max(x1, x2), max(y1, y2)))
+            self.draw.rectangle([x1, y1, x2, y2], fill=self.background_colour, outline=self.background_colour)
             self.update_canvas()
             self.cancel_selection()
 
@@ -270,6 +284,7 @@ class MainPaint:
             x1, y1 = self.selection_start
             self.selection_rect = (x1, y1, event.x, event.y)
             self.update_canvas()
+
 
 if __name__ == "__main__":
     root = tk.Tk()
