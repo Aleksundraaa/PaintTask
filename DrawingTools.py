@@ -45,7 +45,7 @@ class DrawingTools:
         elif self.text_active:
             self.finish_text_input()
 
-    def apply_gaussian_blur_at(self, x, y, region_size=40, radius=5):
+    def apply_gaussian_blur_at(self, x, y, radius, region_size=40):
         left = max(x - region_size // 2, 0)
         right = min(x + region_size // 2, self.canvas_manager.image.width)
         upper = max(y - region_size // 2, 0)
@@ -120,7 +120,7 @@ class DrawingTools:
             self.draw_temp_shape(x, y)
 
         elif self.current_tool == "gauss":
-            self.apply_gaussian_blur_at(x, y)
+            self.apply_gaussian_blur_at(x, y, self.current_size)
             self.canvas_manager.update_canvas()
 
 
