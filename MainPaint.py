@@ -15,8 +15,8 @@ class MainPaint:
         self.root.title("Графический редактор")
 
         self.canvas_manager = CanvasManager(root, 800, 600, "white")
-        self.selection_manager = SelectionManager(self.canvas_manager)
         self.drawing_tools = DrawingTools(self.canvas_manager)
+        self.selection_manager = SelectionManager(self.canvas_manager, self.drawing_tools)
         self.history_manager = HistoryManager(self.canvas_manager)
 
         self.clipboard = None

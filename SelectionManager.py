@@ -1,10 +1,13 @@
 from PIL import ImageTk, ImageDraw
 import tkinter as tk
+from DrawingTools import DrawingTools
 
 
 class SelectionManager:
-    def __init__(self, canvas_manager):
+    def __init__(self, canvas_manager, drawing_tools):
         self.canvas_manager = canvas_manager
+        self.drawing_tools = drawing_tools
+        self.color = drawing_tools.current_color
         self.rect = None
         self.start = None
         self.end = None
@@ -84,7 +87,7 @@ class SelectionManager:
         if self.rect:
             x1, y1, x2, y2 = self.rect
             self.canvas_manager.canvas.create_rectangle(
-                x1, y1, x2, y2, outline="red", dash=(4, 4), tags="selection")
+                x1, y1, x2, y2, outline="black", dash=(4, 4), tags="selection")
             if self.selection_image and self.dragging:
                 selection_photo = ImageTk.PhotoImage(self.selection_image)
                 self.canvas_manager.canvas.create_image(
