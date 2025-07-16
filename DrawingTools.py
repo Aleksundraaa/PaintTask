@@ -1,4 +1,5 @@
-from PIL import ImageDraw, ImageColor
+from PIL import ImageDraw, ImageColor, ImageFont, ImageFilter
+import tkinter as tk
 
 
 class DrawingTools:
@@ -7,13 +8,21 @@ class DrawingTools:
         self.current_tool = "brush"
         self.current_color = "black"
         self.current_size = 5
+        self.current_text_size = 12
         self.last_x = None
         self.last_y = None
         self.start_x = None
         self.start_y = None
+        self.current_font = ImageFont.load_default()
+        self.text_entry = None
+        self.text_start_pos = None
+        self.text_active = False
 
     def set_tool(self, tool):
+        if self.text_entry:
+            self.finish_text_input()
         self.current_tool = tool
+        self.text_active = False
 
     def set_color(self, color):
         self.current_color = color
@@ -29,6 +38,73 @@ class DrawingTools:
             fill_color = ImageColor.getrgb(self.current_color)
             ImageDraw.floodfill(self.canvas_manager.image, (x, y), fill_color)
             self.canvas_manager.update_canvas()
+        elif self.current_tool == "text" and not self.text_active:
+            self.start_text_input(x, y)
+            self.text_active = True
+
+        elif self.text_active:
+            self.finish_text_input()
+
+    def apply_gaussian_blur_at(self, x, y, region_size=40, radius=5):
+        left = max(x - region_size // 2, 0)
+        right = min(x + region_size // 2, self.canvas_manager.image.width)
+        upper = max(y - region_size // 2, 0)
+        lower = min(y + region_size // 2, self.canvas_manager.image.height)
+
+        region = self.canvas_manager.image.crop((left, upper, right, lower))
+        blurred_region = region.filter(ImageFilter.GaussianBlur(radius=radius))
+        self.canvas_manager.image.paste(blurred_region, (left, upper))
+
+    def start_text_input(self, x, y):
+        self.text_start_pos = (x, y)
+
+        self.text_entry = tk.Text(
+            self.canvas_manager.canvas,
+            width=30,
+            height=1,
+            font=("Arial", self.current_text_size),
+            wrap=tk.WORD,
+            bd=1,
+            relief=tk.SOLID
+        )
+
+        self.canvas_manager.canvas.create_window(
+            x, y,
+            window=self.text_entry,
+            anchor=tk.NW,
+            tags="text_input"
+        )
+
+        self.text_entry.focus_set()
+
+        self.text_entry.bind("<Return>", lambda e: self.finish_text_input())
+
+    def finish_text_input(self, event=None):
+        if self.text_entry and self.text_start_pos:
+            text = self.text_entry.get("1.0", "end-1c")
+
+            if text.strip():
+                x, y = self.text_start_pos
+
+                try:
+                    font = ImageFont.truetype("arial.ttf", self.current_text_size)
+                except:
+                    font = ImageFont.load_default()
+
+                self.canvas_manager.draw.text(
+                    (x, y),
+                    text,
+                    fill=self.current_color,
+                    font=font
+                )
+
+                self.canvas_manager.update_canvas()
+
+            self.text_entry.destroy()
+            self.text_entry = None
+            self.canvas_manager.canvas.delete("text_input")
+            self.text_start_pos = None
+            self.text_active = False
 
     def on_mouse_drag(self, x, y):
         if self.current_tool in ["brush", "eraser"]:
@@ -42,6 +118,11 @@ class DrawingTools:
 
         elif self.current_tool in ["circle", "rectangle", "straight_line", "ellipse"]:
             self.draw_temp_shape(x, y)
+
+        elif self.current_tool == "gauss":
+            self.apply_gaussian_blur_at(x, y)
+            self.canvas_manager.update_canvas()
+
 
     def on_button_release(self, x, y):
         if self.current_tool == "circle":

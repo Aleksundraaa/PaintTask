@@ -1,5 +1,5 @@
 import tkinter as tk
-
+from PIL import ImageFilter
 
 class MenuBuilder:
     def __init__(self, root, app):
@@ -50,6 +50,7 @@ class MenuBuilder:
         tools_menu.add_command(label="Кисть", command=lambda: self.app.drawing_tools.set_tool("brush"))
         tools_menu.add_command(label="Ластик", command=lambda: self.app.drawing_tools.set_tool("eraser"))
         tools_menu.add_command(label="Заливка", command=lambda: self.app.drawing_tools.set_tool("fill"))
+        tools_menu.add_command(label="Размытие по Гауссу", command=lambda: self.app.drawing_tools.set_tool("gauss"))
 
     def _setup_color_menu(self, menu):
         colour_menu = tk.Menu(menu)
@@ -65,8 +66,7 @@ class MenuBuilder:
                                   command=lambda: self.app.drawing_tools.set_tool("straight_line"))
         geometry_menu.add_command(label="Эллипс", command=lambda: self.app.drawing_tools.set_tool("ellipse"))
 
-    @staticmethod
-    def _setup_text_menu(menu):
+    def _setup_text_menu(self, menu):
         text_menu = tk.Menu(menu)
         menu.add_cascade(label="Текст", menu=text_menu)
-        text_menu.add_command(label="Добавить текст")
+        text_menu.add_command(label="Добавить текст", command=lambda: self.app.add_text())

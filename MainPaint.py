@@ -35,16 +35,21 @@ class MainPaint:
         self.root.bind("<Control-z>", self.undo)
         self.root.bind("<Control-s>", self.save_image)
         self.root.bind("<Control-x>", lambda e: self.cut_selection())
+        self.root.bind("<Button-1>", self.handle_global_click, add="+")
+
+    def handle_global_click(self, event):
+        if (self.drawing_tools.current_tool == "text" and
+                self.drawing_tools.text_entry and
+                not self.drawing_tools.text_entry.winfo_containing(event.x_root, event.y_root)):
+            self.drawing_tools.finish_text_input()
 
     def on_button_press(self, event):
         self.history_manager.save_state()
 
         if self.drawing_tools.current_tool == "selection":
             if self.selection_manager.rect and self.selection_manager.point_in_selection(event.x, event.y):
-                # Если клик внутри существующего выделения - начинаем перетаскивание
                 self.selection_manager.start_dragging(event.x, event.y)
             else:
-                # Иначе начинаем новое выделение
                 self.selection_manager.start_selection(event.x, event.y)
         else:
             self.drawing_tools.on_button_press(event.x, event.y)
@@ -109,3 +114,6 @@ class MainPaint:
 
     def undo(self, event=None):
         self.history_manager.undo()
+
+    def add_text(self):
+        self.drawing_tools.set_tool("text")
