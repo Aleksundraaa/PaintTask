@@ -182,3 +182,4 @@ class DrawingTools:
         self.canvas_manager.draw.ellipse([
             self.start_x, self.start_y, x, y],
             outline=self.current_color, width=self.current_size)
+

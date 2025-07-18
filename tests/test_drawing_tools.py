@@ -87,7 +87,6 @@ def test_gauss_blur(mock_canvas_manager):
     drawing_tools.set_tool("gauss")
     drawing_tools.on_mouse_drag(50, 50)
     after_blur_color = mock_canvas_manager.image.crop((45, 45, 55, 55)).getcolors()
-
     assert before_blur_color != after_blur_color
 
 
@@ -98,3 +97,36 @@ def test_on_button_release(mock_canvas_manager):
     tools.on_button_release(30, 40)
     assert tools.last_x is None
     assert tools.last_y is None
+
+
+def test_draw_rectangle(mock_canvas_manager):
+    tools = DrawingTools(mock_canvas_manager)
+    tools.set_color("black")
+    tools.set_size(3)
+    tools.start_x, tools.start_y = 10, 10
+    tools.draw_rectangle(30, 30)
+
+    pixel = mock_canvas_manager.image.getpixel((10, 10))
+    assert pixel != (255, 255, 255)
+
+
+def test_draw_ellipse(mock_canvas_manager):
+    tools = DrawingTools(mock_canvas_manager)
+    tools.set_color("red")
+    tools.set_size(2)
+    tools.start_x, tools.start_y = 20, 20
+    tools.draw_ellipse(40, 35)
+
+    pixel = mock_canvas_manager.image.getpixel((30, 27))
+    assert pixel != (255, 255, 255)
+
+
+def test_draw_circle(mock_canvas_manager):
+    tools = DrawingTools(mock_canvas_manager)
+    tools.set_color("blue")
+    tools.set_size(1)
+    tools.start_x, tools.start_y = 50, 50
+    tools.draw_circle(60, 50)
+
+    pixel = mock_canvas_manager.image.getpixel((60, 50))
+    assert pixel != (255, 255, 255)
