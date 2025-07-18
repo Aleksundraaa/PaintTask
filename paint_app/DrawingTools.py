@@ -71,6 +71,19 @@ class DrawingTools:
         grayscale_region = region.convert("L").convert("RGB")
         self.canvas_manager.image.paste(grayscale_region, (left, upper))
 
+    def apply_sharpen_at(self, x, y, region_size=40):
+        left = max(x - region_size // 2, 0)
+        right = min(x + region_size // 2, self.canvas_manager.image.width)
+        upper = max(y - region_size // 2, 0)
+        lower = min(y + region_size // 2, self.canvas_manager.image.height)
+
+        if left >= right or upper >= lower:
+            return
+
+        region = self.canvas_manager.image.crop((left, upper, right, lower))
+        sharpened_region = region.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+        self.canvas_manager.image.paste(sharpened_region, (left, upper))
+
     def start_text_input(self, x, y):
         self.text_start_pos = (x, y)
 
@@ -141,6 +154,10 @@ class DrawingTools:
 
         elif self.current_tool == "grayscale":
             self.apply_grayscale_at(x, y, self.current_size)
+            self.canvas_manager.update_canvas()
+
+        elif self.current_tool == "sharpen":
+            self.apply_sharpen_at(x, y, self.current_size)
             self.canvas_manager.update_canvas()
 
     def on_button_release(self, x, y):

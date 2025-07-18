@@ -54,6 +54,7 @@ class MenuBuilder:
         tools_menu.add_command(label="Ластик", command=lambda: self.app.drawing_tools.set_tool("eraser"))
         tools_menu.add_command(label="Заливка", command=lambda: self.app.drawing_tools.set_tool("fill"))
         tools_menu.add_command(label="Перевод в чб", command=lambda: self.app.drawing_tools.set_tool("grayscale"))
+        tools_menu.add_command(label="Повышение резкости", command=lambda: self.app.drawing_tools.set_tool("sharpen"))
         blur_menu = tk.Menu(menu)
         tools_menu.add_cascade(label="Размытие", menu=blur_menu)
         blur_menu.add_command(label="Размытие по Гауссу", command=lambda: self.app.drawing_tools.set_tool("gauss"))
