@@ -58,7 +58,7 @@ class DrawingTools:
         blurred_region = region.filter(ImageFilter.GaussianBlur(radius=radius))
         self.canvas_manager.image.paste(blurred_region, (left, upper))
 
-    def apply_grayscale_at(self, x, y, radius, region_size=40):
+    def apply_grayscale_at(self, x, y, region_size=40):
         left = max(x - region_size // 2, 0)
         right = min(x + region_size // 2, self.canvas_manager.image.width)
         upper = max(y - region_size // 2, 0)

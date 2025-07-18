@@ -90,9 +90,27 @@ def test_gauss_blur(mock_canvas_manager):
     drawing_tools.set_tool("gauss")
     drawing_tools.on_mouse_drag(50, 50)
 
-    after_blur = mock_canvas_manager.image.crop((45, 45, 55, 55))
+    after_blur = mock_canvas_manager.image.crop((45, 45, 55, 55)).copy()
 
     assert list(before_blur.getdata()) != list(after_blur.getdata())
+
+
+def test_grayscale(mock_canvas_manager):
+    drawing_tools = DrawingTools(mock_canvas_manager)
+    drawing_tools.set_tool("brush")
+    drawing_tools.set_color("green")
+    drawing_tools.set_size(5)
+
+    drawing_tools.start_x, drawing_tools.start_y = 40, 40
+    drawing_tools.draw_line(60, 60)
+
+    before_grayscale = mock_canvas_manager.image.crop((45, 45, 55, 55))
+    drawing_tools.set_tool("grayscale")
+    drawing_tools.on_mouse_drag(50, 50)
+
+    after_grayscale = mock_canvas_manager.image.crop((45, 45, 55, 55)).copy()
+
+    assert list(before_grayscale.getdata()) != list(after_grayscale.getdata())
 
 
 def test_on_button_release(mock_canvas_manager):
