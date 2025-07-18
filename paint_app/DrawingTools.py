@@ -51,9 +51,25 @@ class DrawingTools:
         upper = max(y - region_size // 2, 0)
         lower = min(y + region_size // 2, self.canvas_manager.image.height)
 
+        if left >= right or upper >= lower:
+            return
+
         region = self.canvas_manager.image.crop((left, upper, right, lower))
         blurred_region = region.filter(ImageFilter.GaussianBlur(radius=radius))
         self.canvas_manager.image.paste(blurred_region, (left, upper))
+
+    def apply_grayscale_at(self, x, y, radius, region_size=40):
+        left = max(x - region_size // 2, 0)
+        right = min(x + region_size // 2, self.canvas_manager.image.width)
+        upper = max(y - region_size // 2, 0)
+        lower = min(y + region_size // 2, self.canvas_manager.image.height)
+
+        if left >= right or upper >= lower:
+            return
+
+        region = self.canvas_manager.image.crop((left, upper, right, lower))
+        grayscale_region = region.convert("L").convert("RGB")
+        self.canvas_manager.image.paste(grayscale_region, (left, upper))
 
     def start_text_input(self, x, y):
         self.text_start_pos = (x, y)
@@ -121,6 +137,10 @@ class DrawingTools:
 
         elif self.current_tool == "gauss":
             self.apply_gaussian_blur_at(x, y, self.current_size)
+            self.canvas_manager.update_canvas()
+
+        elif self.current_tool == "grayscale":
+            self.apply_grayscale_at(x, y, self.current_size)
             self.canvas_manager.update_canvas()
 
     def on_button_release(self, x, y):
