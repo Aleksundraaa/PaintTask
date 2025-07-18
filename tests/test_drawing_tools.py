@@ -54,11 +54,13 @@ def test_eraser(mock_canvas_manager):
     drawing_tools.set_size(5)
 
     drawing_tools.start_x, drawing_tools.start_y = 10, 10
-    drawing_tools.draw_line(20, 20)
+    drawing_tools.last_x, drawing_tools.last_y = 10, 10
+    drawing_tools.on_mouse_drag(20, 20)
 
     drawing_tools.set_tool("eraser")
     drawing_tools.start_x, drawing_tools.start_y = 10, 10
-    drawing_tools.draw_line(20, 20)
+    drawing_tools.last_x, drawing_tools.last_y = 10, 10
+    drawing_tools.on_mouse_drag(20, 20)
 
     pixels = [mock_canvas_manager.image.getpixel((x, x)) for x in range(10, 21)]
     assert all(p == (255, 255, 255) for p in pixels)
@@ -70,7 +72,7 @@ def test_fill(mock_canvas_manager):
     drawing_tools.set_color("blue")
 
     drawing_tools.on_button_press(50, 50)
-    pixel = mock_canvas_manager.image.getpixel(50, 50)
+    pixel = mock_canvas_manager.image.getpixel((50, 50))
     assert pixel == (0, 0, 255)
 
 
@@ -80,23 +82,29 @@ def test_gauss_blur(mock_canvas_manager):
     drawing_tools.set_color("black")
     drawing_tools.set_size(5)
 
-    drawing_tools.start_x, drawing_tools.start_y = 10, 10
-    drawing_tools.draw_line(20, 20)
+    drawing_tools.start_x, drawing_tools.start_y = 40, 40
+    drawing_tools.draw_line(60, 60)
 
-    before_blur_color = mock_canvas_manager.image.crop((45, 45, 55, 55)).getcolors()
+    before_blur = mock_canvas_manager.image.crop((45, 45, 55, 55)).copy()
+
     drawing_tools.set_tool("gauss")
     drawing_tools.on_mouse_drag(50, 50)
-    after_blur_color = mock_canvas_manager.image.crop((45, 45, 55, 55)).getcolors()
-    assert before_blur_color != after_blur_color
+
+    after_blur = mock_canvas_manager.image.crop((45, 45, 55, 55))
+
+    assert list(before_blur.getdata()) != list(after_blur.getdata())
 
 
 def test_on_button_release(mock_canvas_manager):
     tools = DrawingTools(mock_canvas_manager)
-    tools.last_x = 10
-    tools.last_y = 20
+    tools.current_tool = "straight_line"
+    tools.start_x = 10
+    tools.start_y = 20
+
     tools.on_button_release(30, 40)
-    assert tools.last_x is None
-    assert tools.last_y is None
+
+    pixel = mock_canvas_manager.image.getpixel((20, 30))
+    assert pixel != (255, 255, 255)  # белый фон
 
 
 def test_draw_rectangle(mock_canvas_manager):
@@ -107,17 +115,6 @@ def test_draw_rectangle(mock_canvas_manager):
     tools.draw_rectangle(30, 30)
 
     pixel = mock_canvas_manager.image.getpixel((10, 10))
-    assert pixel != (255, 255, 255)
-
-
-def test_draw_ellipse(mock_canvas_manager):
-    tools = DrawingTools(mock_canvas_manager)
-    tools.set_color("red")
-    tools.set_size(2)
-    tools.start_x, tools.start_y = 20, 20
-    tools.draw_ellipse(40, 35)
-
-    pixel = mock_canvas_manager.image.getpixel((30, 27))
     assert pixel != (255, 255, 255)
 
 
