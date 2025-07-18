@@ -123,7 +123,6 @@ class DrawingTools:
             self.apply_gaussian_blur_at(x, y, self.current_size)
             self.canvas_manager.update_canvas()
 
-
     def on_button_release(self, x, y):
         if self.current_tool == "circle":
             self.draw_circle(x, y)
@@ -182,4 +181,3 @@ class DrawingTools:
         self.canvas_manager.draw.ellipse([
             self.start_x, self.start_y, x, y],
             outline=self.current_color, width=self.current_size)
-

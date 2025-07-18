@@ -1,6 +1,5 @@
 from PIL import ImageTk, ImageDraw
 import tkinter as tk
-from DrawingTools import DrawingTools
 
 
 class SelectionManager:
