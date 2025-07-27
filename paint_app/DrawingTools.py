@@ -68,8 +68,15 @@ class DrawingTools:
             return
 
         region = self.canvas_manager.image.crop((left, upper, right, lower))
-        grayscale_region = region.convert("L").convert("RGB")
-        self.canvas_manager.image.paste(grayscale_region, (left, upper))
+        pixels = region.load()
+
+        for i in range(region.width):
+            for j in range(region.height):
+                r, g, b = pixels[i, j]
+                gray = int(0.299 * r + 0.587 * g + 0.114 * b)
+                pixels[i, j] = (gray, gray, gray)
+
+        self.canvas_manager.image.paste(region, (left, upper))
 
     def apply_sharpen_at(self, x, y, region_size=40):
         left = max(x - region_size // 2, 0)
