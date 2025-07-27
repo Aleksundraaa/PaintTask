@@ -71,7 +71,8 @@ class MainPaint:
             defaultextension='.png',
             filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"), ("BMP files", "*.bmp")])
         if file_path:
-            self.canvas_manager.image.save(file_path)
+            composited = self.canvas_manager.get_composited_image()
+            composited.save(file_path)
             messagebox.showinfo("Сохранение...", "Сохранено!")
 
     def change_canvas_size(self):
@@ -94,9 +95,10 @@ class MainPaint:
         if self.selection_manager.rect:
             self.history_manager.save_state()
             x1, y1, x2, y2 = self.selection_manager.get_selection_area()
-            temp_image = Image.new("RGB", (abs(x2 - x1), abs(y2 - y1)), self.drawing_tools.current_color)
-            self.canvas_manager.image.paste(temp_image, (min(x1, x2), min(y1, y2)))
-            self.canvas_manager.draw = ImageDraw.Draw(self.canvas_manager.image)
+            temp_image = Image.new("RGBA", (abs(x2 - x1), abs(y2 - y1)), self.drawing_tools.current_color)
+            layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+            layer.paste(temp_image, (min(x1, x2), min(y1, y2)))
+            self.canvas_manager.update_draw()
             self.canvas_manager.update_canvas()
             self.selection_manager.cancel_selection()
 
@@ -104,11 +106,13 @@ class MainPaint:
         if self.selection_manager.rect:
             self.history_manager.save_state()
             x1, y1, x2, y2 = self.selection_manager.get_selection_area()
-            self.clipboard = self.canvas_manager.image.crop((x1, y1, x2, y2))
-            self.canvas_manager.draw.rectangle(
-                [x1, y1, x2, y2],
-                fill=self.canvas_manager.bg_color,
-                outline=self.canvas_manager.bg_color)
+            layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+            self.clipboard = layer.crop((x1, y1, x2, y2))
+            draw = ImageDraw.Draw(layer)
+            draw.rectangle([x1, y1, x2, y2],
+                           fill=self.canvas_manager.bg_color,
+                           outline=self.canvas_manager.bg_color)
+            self.canvas_manager.update_draw()
             self.canvas_manager.update_canvas()
             self.selection_manager.cancel_selection()
 

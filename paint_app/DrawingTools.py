@@ -1,4 +1,4 @@
-from PIL import ImageDraw, ImageColor, ImageFont, ImageFilter, Image
+from PIL import ImageDraw, ImageColor, ImageFont, Image
 import tkinter as tk
 
 
@@ -13,7 +13,6 @@ class DrawingTools:
         self.last_y = None
         self.start_x = None
         self.start_y = None
-        self.current_font = ImageFont.load_default()
         self.text_entry = None
         self.text_start_pos = None
         self.text_active = False
@@ -34,10 +33,16 @@ class DrawingTools:
         self.start_x, self.start_y = x, y
         self.last_x, self.last_y = x, y
 
+        active_layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+
         if self.current_tool == "fill":
             fill_color = ImageColor.getrgb(self.current_color)
-            ImageDraw.floodfill(self.canvas_manager.image, (x, y), fill_color)
+            try:
+                ImageDraw.floodfill(active_layer, (x, y), fill_color)
+            except Exception:
+                print("Ошибка")
             self.canvas_manager.update_canvas()
+
         elif self.current_tool == "text" and not self.text_active:
             self.start_text_input(x, y)
             self.text_active = True
@@ -46,17 +51,18 @@ class DrawingTools:
             self.finish_text_input()
 
     def apply_gaussian_blur_at(self, x, y, radius=1, region_size=40):
+        active_layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+
         left = max(x - region_size // 2, 0)
-        right = min(x + region_size // 2, self.canvas_manager.image.width)
+        right = min(x + region_size // 2, active_layer.width)
         upper = max(y - region_size // 2, 0)
-        lower = min(y + region_size // 2, self.canvas_manager.image.height)
+        lower = min(y + region_size // 2, active_layer.height)
 
         if left >= right or upper >= lower:
             return
 
-        region = self.canvas_manager.image.crop((left, upper, right, lower)).convert("RGB")
+        region = active_layer.crop((left, upper, right, lower)).convert("RGB")
         pixels = region.load()
-
         width, height = region.size
         result = Image.new("RGB", (width, height))
         result_pixels = result.load()
@@ -82,38 +88,47 @@ class DrawingTools:
 
                 result_pixels[i, j] = (r_avg, g_avg, b_avg)
 
-        self.canvas_manager.image.paste(result, (left, upper))
+        active_layer.paste(result, (left, upper))
+        self.canvas_manager.update_canvas()
 
     def apply_grayscale_at(self, x, y, region_size=40):
+        active_layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+
         left = max(x - region_size // 2, 0)
-        right = min(x + region_size // 2, self.canvas_manager.image.width)
+        right = min(x + region_size // 2, active_layer.width)
         upper = max(y - region_size // 2, 0)
-        lower = min(y + region_size // 2, self.canvas_manager.image.height)
+        lower = min(y + region_size // 2, active_layer.height)
 
         if left >= right or upper >= lower:
             return
 
-        region = self.canvas_manager.image.crop((left, upper, right, lower))
+        region = active_layer.crop((left, upper, right, lower))
         pixels = region.load()
 
         for i in range(region.width):
             for j in range(region.height):
-                r, g, b = pixels[i, j]
-                gray = int(0.299 * r + 0.587 * g + 0.114 * b)
-                pixels[i, j] = (gray, gray, gray)
+                pixel = pixels[i, j]
+                r, g, b = pixel[:3]  # Берём первые три канала
+                a = pixel[3] if len(pixel) == 4 else 255  # Альфа, если есть
 
-        self.canvas_manager.image.paste(region, (left, upper))
+                gray = int(0.299 * r + 0.587 * g + 0.114 * b)
+                pixels[i, j] = (gray, gray, gray, a)
+
+        active_layer.paste(region, (left, upper))
+        self.canvas_manager.update_canvas()
 
     def apply_sharpen_at(self, x, y, region_size=40):
+        active_layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+
         left = max(x - region_size // 2, 0)
-        right = min(x + region_size // 2, self.canvas_manager.image.width)
+        right = min(x + region_size // 2, active_layer.width)
         upper = max(y - region_size // 2, 0)
-        lower = min(y + region_size // 2, self.canvas_manager.image.height)
+        lower = min(y + region_size // 2, active_layer.height)
 
         if left >= right or upper >= lower:
             return
 
-        region = self.canvas_manager.image.crop((left, upper, right, lower)).convert("RGB")
+        region = active_layer.crop((left, upper, right, lower)).convert("RGB")
         pixels = region.load()
 
         width, height = region.size
@@ -152,7 +167,8 @@ class DrawingTools:
 
                 result_pixels[i, j] = (sr, sg, sb)
 
-        self.canvas_manager.image.paste(result, (left, upper))
+        active_layer.paste(result, (left, upper))
+        self.canvas_manager.update_canvas()
 
     def start_text_input(self, x, y):
         self.text_start_pos = (x, y)
@@ -175,7 +191,6 @@ class DrawingTools:
         )
 
         self.text_entry.focus_set()
-
         self.text_entry.bind("<Return>", lambda e: self.finish_text_input())
 
     def finish_text_input(self, event=None):
@@ -187,7 +202,7 @@ class DrawingTools:
 
                 try:
                     font = ImageFont.truetype("arial.ttf", self.current_text_size)
-                except:
+                except Exception:
                     font = ImageFont.load_default()
 
                 self.canvas_manager.draw.text(
@@ -206,10 +221,10 @@ class DrawingTools:
             self.text_active = False
 
     def on_mouse_drag(self, x, y):
+        active_layer = self.canvas_manager.layers[self.canvas_manager.active_layer_index]
+
         if self.current_tool in ["brush", "eraser"]:
-            color = self.current_color if self.current_tool == "brush" else self.canvas_manager.bg_color
-            self.canvas_manager.canvas.create_line(
-                self.last_x, self.last_y, x, y, fill=color, width=self.current_size)
+            color = self.current_color if self.current_tool == "brush" else (0, 0, 0, 0)
             self.canvas_manager.draw.line(
                 [self.last_x, self.last_y, x, y], fill=color, width=self.current_size)
             self.last_x, self.last_y = x, y
@@ -220,15 +235,12 @@ class DrawingTools:
 
         elif self.current_tool == "gauss":
             self.apply_gaussian_blur_at(x, y, self.current_size)
-            self.canvas_manager.update_canvas()
 
         elif self.current_tool == "grayscale":
             self.apply_grayscale_at(x, y, self.current_size)
-            self.canvas_manager.update_canvas()
 
         elif self.current_tool == "sharpen":
             self.apply_sharpen_at(x, y, self.current_size)
-            self.canvas_manager.update_canvas()
 
     def on_button_release(self, x, y):
         if self.current_tool == "circle":
@@ -241,6 +253,7 @@ class DrawingTools:
             self.draw_ellipse(x, y)
 
         self.canvas_manager.update_canvas()
+        self.canvas_manager.canvas.delete("temp_shape")
 
     def draw_temp_shape(self, x, y):
         self.canvas_manager.canvas.delete("temp_shape")
