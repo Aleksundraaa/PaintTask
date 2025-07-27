@@ -1,4 +1,4 @@
-from PIL import ImageDraw, ImageColor, ImageFont, ImageFilter
+from PIL import ImageDraw, ImageColor, ImageFont, ImageFilter, Image
 import tkinter as tk
 
 
@@ -87,9 +87,46 @@ class DrawingTools:
         if left >= right or upper >= lower:
             return
 
-        region = self.canvas_manager.image.crop((left, upper, right, lower))
-        sharpened_region = region.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
-        self.canvas_manager.image.paste(sharpened_region, (left, upper))
+        region = self.canvas_manager.image.crop((left, upper, right, lower)).convert("RGB")
+        pixels = region.load()
+
+        width, height = region.size
+        result = Image.new("RGB", (width, height))
+        result_pixels = result.load()
+
+        amount = 1.5
+        for i in range(width):
+            for j in range(height):
+                r, g, b = pixels[i, j]
+
+                neighbors = []
+                if i > 0:
+                    neighbors.append(pixels[i - 1, j])
+                if i < width - 1:
+                    neighbors.append(pixels[i + 1, j])
+                if j > 0:
+                    neighbors.append(pixels[i, j - 1])
+                if j < height - 1:
+                    neighbors.append(pixels[i, j + 1])
+
+                if neighbors:
+                    nr = sum(n[0] for n in neighbors) / len(neighbors)
+                    ng = sum(n[1] for n in neighbors) / len(neighbors)
+                    nb = sum(n[2] for n in neighbors) / len(neighbors)
+                else:
+                    nr, ng, nb = r, g, b
+
+                sr = int(r + amount * (r - nr))
+                sg = int(g + amount * (g - ng))
+                sb = int(b + amount * (b - nb))
+
+                sr = max(0, min(255, sr))
+                sg = max(0, min(255, sg))
+                sb = max(0, min(255, sb))
+
+                result_pixels[i, j] = (sr, sg, sb)
+
+        self.canvas_manager.image.paste(result, (left, upper))
 
     def start_text_input(self, x, y):
         self.text_start_pos = (x, y)
