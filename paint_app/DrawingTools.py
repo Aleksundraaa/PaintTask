@@ -45,7 +45,7 @@ class DrawingTools:
         elif self.text_active:
             self.finish_text_input()
 
-    def apply_gaussian_blur_at(self, x, y, radius, region_size=40):
+    def apply_gaussian_blur_at(self, x, y, radius=1, region_size=40):
         left = max(x - region_size // 2, 0)
         right = min(x + region_size // 2, self.canvas_manager.image.width)
         upper = max(y - region_size // 2, 0)
@@ -54,9 +54,35 @@ class DrawingTools:
         if left >= right or upper >= lower:
             return
 
-        region = self.canvas_manager.image.crop((left, upper, right, lower))
-        blurred_region = region.filter(ImageFilter.GaussianBlur(radius=radius))
-        self.canvas_manager.image.paste(blurred_region, (left, upper))
+        region = self.canvas_manager.image.crop((left, upper, right, lower)).convert("RGB")
+        pixels = region.load()
+
+        width, height = region.size
+        result = Image.new("RGB", (width, height))
+        result_pixels = result.load()
+
+        for i in range(width):
+            for j in range(height):
+                r_sum, g_sum, b_sum = 0, 0, 0
+                count = 0
+
+                for dx in range(-radius, radius + 1):
+                    for dy in range(-radius, radius + 1):
+                        nx, ny = i + dx, j + dy
+                        if 0 <= nx < width and 0 <= ny < height:
+                            pr, pg, pb = pixels[nx, ny]
+                            r_sum += pr
+                            g_sum += pg
+                            b_sum += pb
+                            count += 1
+
+                r_avg = int(r_sum / count)
+                g_avg = int(g_sum / count)
+                b_avg = int(b_sum / count)
+
+                result_pixels[i, j] = (r_avg, g_avg, b_avg)
+
+        self.canvas_manager.image.paste(result, (left, upper))
 
     def apply_grayscale_at(self, x, y, region_size=40):
         left = max(x - region_size // 2, 0)
